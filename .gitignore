@@ -1,0 +1,27 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environment
+venv/
+.env/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+
+token.json
+credentials.json
+
+# Gmail OAuth (inside folder)
+gmail_read_write/token.json
+gmail_read_write/credentials.json
