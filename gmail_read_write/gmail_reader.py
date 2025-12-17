@@ -7,7 +7,8 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
-SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+# Changed scope from readonly to modify
+SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 
 
 def get_service():
@@ -18,7 +19,9 @@ def get_service():
         creds = Credentials.from_authorized_user_file("token.json", SCOPES)
 
     if not creds or not creds.valid:
-        flow = InstalledAppFlow.from_client_secrets_file("credentials.json", SCOPES)
+        flow = InstalledAppFlow.from_client_secrets_file(
+            "credentials.json", SCOPES
+        )
         creds = flow.run_local_server(port=0)
 
         with open("token.json", "w") as token:
@@ -43,19 +46,27 @@ def extract_body(payload):
     return ""
 
 
+def mark_as_read(service, msg_id):
+    """Mark email as read by removing UNREAD label."""
+    service.users().messages().modify(
+        userId="me",
+        id=msg_id,
+        body={"removeLabelIds": ["UNREAD"]}
+    ).execute()
+
 def get_unread_emails():
-    """Fetch all unread emails with complete important fields."""
+    """Fetch unread emails from last 24 hours, save data, and mark them as read."""
     service = get_service()
 
     results = service.users().messages().list(
         userId="me",
-        q="is:unread"
+        q="is:unread newer_than:1d"
     ).execute()
 
     messages = results.get("messages", [])
     email_list = []
 
-    print(f"Found {len(messages)} unread emails")
+    print(f"Found {len(messages)} unread emails from last 24 hours")
 
     for msg in messages:
         msg_detail = service.users().messages().get(
@@ -69,7 +80,6 @@ def get_unread_emails():
 
         subject = sender = receiver = ""
 
-        # Extract useful header values
         for h in headers:
             name = h.get("name")
             value = h.get("value", "")
@@ -83,7 +93,6 @@ def get_unread_emails():
         body = extract_body(payload)
         snippet = msg_detail.get("snippet", "")
 
-        # Build JSON with all required fields
         email_json = {
             "id": msg["id"],
             "messageId": msg_detail.get("id"),
@@ -97,13 +106,18 @@ def get_unread_emails():
 
         email_list.append(email_json)
 
+        # Mark as read
+        mark_as_read(service, msg["id"])
+
     return email_list
 
 
+
 def save_to_file(data, filename="email_data.json"):
-    """Overwrite the old file with fresh email data."""
+    """Overwrite file with fresh email data."""
     with open(filename, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=4, ensure_ascii=False)
+
     print(f"Saved {len(data)} emails to {filename}")
 
 
